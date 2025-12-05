@@ -20,13 +20,13 @@ def main():
     # Configuration
     config = ReportConfig(
         # Input: where our 50-turn game recording is stored
-        recording_dir='logs/recordings/myagent/',
+        recording_dir='logs/recordings/myagent2/',
 
         # Output: where to save the report
-        output_dir='reports/test_game/',
+        output_dir='reports/test_game_fullterrain/',
 
-        # Generate reports at turns 10, 25, and 50
-        report_turns=[10, 25, 50],
+        # Generate reports at turns 10, 25, 30 (32 is latest so far)
+        report_turns=[10, 25, 30],
 
         # Enable the sections we've implemented
         enabled_sections=['overview', 'historical_events'],
@@ -62,7 +62,7 @@ def main():
     print("\nGenerated files:")
     print(f"  - turn_010_report.html")
     print(f"  - turn_025_report.html")
-    print(f"  - turn_050_report.html")
+    print(f"  - turn_030_report.html")
     print("\nOpen any HTML file in your browser to view the report.")
 
     return 0

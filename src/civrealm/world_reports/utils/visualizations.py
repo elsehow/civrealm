@@ -93,32 +93,36 @@ class MapVisualizer:
         # Create figure
         fig, ax = plt.subplots(figsize=(16, 10), dpi=self.dpi)
 
-        # Render terrain as base layer if available
+        # Show terrain as simple gray (land) and white (water) base layer
         if terrain is not None:
-            # Create terrain color map
-            terrain_colors = [TERRAIN_COLORS_BY_ID.get(i, '#FFFFFF') for i in range(256)]
-            terrain_cmap = ListedColormap(terrain_colors)
+            # Create simple binary map: white for water, gray for land
+            terrain_simple = np.ones_like(terrain, dtype=float)  # Start with white
 
-            # Render terrain
-            ax.imshow(terrain, cmap=terrain_cmap, vmin=0, vmax=255,
+            # Water terrain IDs: 1=Lake, 2=Ocean, 3=Deep Ocean
+            # Everything else is land
+            water_mask = (terrain == 1) | (terrain == 2) | (terrain == 3)
+            land_mask = ~water_mask
+
+            # White for water, medium gray for land
+            terrain_simple[water_mask] = 1.0   # White
+            terrain_simple[land_mask] = 0.6    # Gray
+
+            # Show simple terrain
+            ax.imshow(terrain_simple, cmap='gray', vmin=0, vmax=1,
                      interpolation='nearest', aspect='auto', alpha=1.0)
 
-            # Overlay player territories with semi-transparency
-            # Create a masked array where -1 (unowned) is transparent
-            territory_mask = np.ma.masked_where(tile_owner == -1, tile_owner)
+        # Overlay player control with semi-transparent colors
+        # Create masked array where unowned (-1) is transparent
+        tile_owner_masked = np.ma.masked_where(tile_owner == -1, tile_owner)
 
-            # Create color map for players (transparent for unowned)
-            player_colors_list = PLAYER_COLORS[:len(player_state)]
-            territory_cmap = ListedColormap(player_colors_list)
+        # Create color map for players (no color for unowned since it's masked)
+        player_colors_list = [PLAYER_COLORS[i] if i < len(PLAYER_COLORS) else '#FF00FF'
+                              for i in range(len(player_state))]
+        cmap = ListedColormap(player_colors_list)
 
-            ax.imshow(territory_mask, cmap=territory_cmap, vmin=0, vmax=len(player_state)-1,
-                     interpolation='nearest', aspect='auto', alpha=0.3)
-        else:
-            # Fallback: just show territory ownership (old behavior)
-            colors = ['#FFFFFF'] + PLAYER_COLORS[:len(player_state)]
-            cmap = ListedColormap(colors)
-            ax.imshow(tile_owner, cmap=cmap, vmin=-1, vmax=len(player_state)-1,
-                     interpolation='nearest', aspect='auto')
+        # Overlay player territories with semi-transparency
+        ax.imshow(tile_owner_masked, cmap=cmap, vmin=0, vmax=len(player_state)-1,
+                 interpolation='nearest', aspect='auto', alpha=0.5)
 
         # Add cities if requested
         if highlight_cities and 'city_owner' in map_state:
@@ -157,14 +161,17 @@ class MapVisualizer:
         radius: int = 10,
         title: str = "Location"
     ) -> BytesIO:
-        """Render a small focused map around a specific location
+        """Render full world map with event location marked (omniscient view)
+
+        Shows all known terrain regardless of exploration status. Unexplored
+        areas appear as light gray, explored areas show actual terrain colors.
 
         Args:
             map_state: Map state dict
             player_state: Player state dict
-            center_x: X coordinate of center
-            center_y: Y coordinate of center
-            radius: Tiles to show in each direction
+            center_x: X coordinate of event location
+            center_y: Y coordinate of event location
+            radius: Not used (kept for API compatibility)
             title: Map title
 
         Returns:
@@ -177,55 +184,44 @@ class MapVisualizer:
         # Get actual dimensions from parsed array
         ysize, xsize = tile_owner.shape
 
-        # Calculate bounds
-        x_min = max(0, center_x - radius)
-        x_max = min(xsize, center_x + radius + 1)
-        y_min = max(0, center_y - radius)
-        y_max = min(ysize, center_y + radius + 1)
+        # Create figure - smaller since showing full world
+        fig, ax = plt.subplots(figsize=(10, 7), dpi=self.dpi)
 
-        # Crop both terrain and tile ownership
-        cropped_owner = tile_owner[y_min:y_max, x_min:x_max]
-
-        # Create figure
-        fig, ax = plt.subplots(figsize=(8, 6), dpi=self.dpi)
-
-        # Render with terrain if available
+        # Show all terrain directly (omniscient view)
+        # Unexplored areas (255) will appear as light gray, explored areas in full color
         if terrain is not None:
-            cropped_terrain = terrain[y_min:y_max, x_min:x_max]
-
-            # Terrain base layer
-            terrain_colors = [TERRAIN_COLORS_BY_ID.get(i, '#FFFFFF') for i in range(256)]
+            # Create terrain color map with all terrain types
+            terrain_colors = [TERRAIN_COLORS_BY_ID.get(i, '#E0E0E0') for i in range(256)]
+            # Unexplored (255) shows as very light gray
+            terrain_colors[255] = '#F5F5F5'  # Very light gray for unexplored
             terrain_cmap = ListedColormap(terrain_colors)
-            ax.imshow(cropped_terrain, cmap=terrain_cmap, vmin=0, vmax=255,
-                     interpolation='nearest', aspect='auto', alpha=1.0)
 
-            # Territory overlay with transparency
-            territory_mask = np.ma.masked_where(cropped_owner == -1, cropped_owner)
-            player_colors_list = PLAYER_COLORS[:len(player_state)]
-            territory_cmap = ListedColormap(player_colors_list)
-            ax.imshow(territory_mask, cmap=territory_cmap, vmin=0, vmax=len(player_state)-1,
-                     interpolation='nearest', aspect='auto', alpha=0.3)
-        else:
-            # Fallback: just show territory
-            colors = ['#FFFFFF'] + PLAYER_COLORS[:len(player_state)]
-            cmap = ListedColormap(colors)
-            ax.imshow(cropped_owner, cmap=cmap, vmin=-1, vmax=len(player_state)-1,
+            # Show terrain directly
+            ax.imshow(terrain, cmap=terrain_cmap, vmin=0, vmax=255,
                      interpolation='nearest', aspect='auto')
+        else:
+            # Fallback: show light gray background
+            ax.set_facecolor('#F5F5F5')
 
-        # Mark center
-        rel_x = center_x - x_min
-        rel_y = center_y - y_min
-        ax.plot(rel_x, rel_y, 'r*', markersize=15, markeredgecolor='black',
-               markeredgewidth=1.5, label='Location')
+        # Mark event location with a large prominent marker
+        ax.plot(center_x, center_y, 'r*', markersize=20, markeredgecolor='black',
+               markeredgewidth=2, label='Event Location', zorder=100)
+
+        # Add a circle around the location for visibility
+        circle = plt.Circle((center_x, center_y), radius=3, color='red',
+                           fill=False, linewidth=2, zorder=99)
+        ax.add_patch(circle)
 
         # Grid
-        ax.grid(True, which='both', color='gray', alpha=0.3, linewidth=0.5)
+        ax.grid(True, which='both', color='gray', alpha=0.2, linewidth=0.5)
+        ax.set_xticks(np.arange(0, xsize, 10))
+        ax.set_yticks(np.arange(0, ysize, 10))
 
         # Labels
-        ax.set_xlabel(f'X ({x_min}-{x_max})')
-        ax.set_ylabel(f'Y ({y_min}-{y_max})')
+        ax.set_xlabel('X Coordinate')
+        ax.set_ylabel('Y Coordinate')
         ax.set_title(title, fontsize=12, fontweight='bold')
-        ax.legend()
+        ax.legend(loc='upper right')
 
         plt.tight_layout()
 
@@ -299,8 +295,10 @@ class MapVisualizer:
 
         # Check if already 2D (list of lists)
         if isinstance(tile_owner_data, list) and len(tile_owner_data) > 0 and isinstance(tile_owner_data[0], list):
-            # Already 2D array
+            # Already 2D array - stored as [xsize, ysize] but we need [ysize, xsize]
             tile_owner = np.array(tile_owner_data, dtype=int)
+            # Transpose so coordinates match: tile_owner[y][x]
+            tile_owner = tile_owner.T
         else:
             # Flat array, need to reshape
             tile_owner = np.array(tile_owner_data, dtype=int).reshape(ysize, xsize)
@@ -315,6 +313,7 @@ class MapVisualizer:
 
         Returns:
             2D numpy array of terrain type IDs (0-13, 255=unknown)
+            Array is transposed to match (y, x) coordinate system
         """
         terrain_data = map_state.get('terrain', [])
 
@@ -323,8 +322,10 @@ class MapVisualizer:
 
         # Check if already 2D (list of lists)
         if isinstance(terrain_data, list) and len(terrain_data) > 0 and isinstance(terrain_data[0], list):
-            # Already 2D array
+            # Already 2D array - stored as [xsize, ysize] but we need [ysize, xsize]
             terrain = np.array(terrain_data, dtype=int)
+            # Transpose so coordinates match: terrain[y][x]
+            terrain = terrain.T
         else:
             # Flat array - but we don't know dimensions, return None
             return None
@@ -346,7 +347,10 @@ class MapVisualizer:
 
         # Check if already 2D
         if isinstance(city_owner_data, list) and len(city_owner_data) > 0 and isinstance(city_owner_data[0], list):
+            # Already 2D array - stored as [xsize, ysize] but we need [ysize, xsize]
             city_owner = np.array(city_owner_data, dtype=int)
+            # Transpose so coordinates match
+            city_owner = city_owner.T
         else:
             city_owner = np.array(city_owner_data, dtype=int).reshape(ysize, xsize)
 
