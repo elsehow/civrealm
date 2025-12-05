@@ -1,7 +1,7 @@
 # The user name used to log in the game. Spaces and underscores are not allowed.
 username: myagent
 # The maximum number of turns per game. The game will end after the turn number reaches this limit.
-max_turns: 50
+max_turns: 200
 # The name of service used. Options: freeciv-web | fciv-net
 service: freeciv-web
 # The URL that hosts the game.

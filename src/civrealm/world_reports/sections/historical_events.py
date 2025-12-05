@@ -193,13 +193,14 @@ class HistoricalEventsSection(BaseSection):
             # Generate territory and arable land graphs
             html_parts.append('<h4>Territorial Expansion Over Time</h4>')
 
-            # Get player names
+            # Get player names (with civilization names)
             first_state = states[sorted_turns[0]] if sorted_turns else {}
             player_names = {}
             if 'player' in first_state:
                 for pid, player in first_state['player'].items():
                     if isinstance(player, dict):
-                        player_names[int(pid)] = player.get('name', f'Player {pid}')
+                        pid_int = int(pid)
+                        player_names[pid_int] = self._get_player_name(pid_int, first_state)
 
             # Calculate territory data for all turns
             territory_data = {}  # {turn: {player_id: tiles}}

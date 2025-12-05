@@ -69,19 +69,49 @@ class BaseSection(ABC):
         """
         return state.get('player', {})
 
+    def _get_nation_name(self, nation_id: int, state: Dict) -> str:
+        """Get nation/civilization name from nation ID
+
+        Args:
+            nation_id: Nation ID
+            state: Game state dict
+
+        Returns:
+            Nation name or empty string if not found
+        """
+        if 'rules' in state and 'nations' in state['rules']:
+            nations = state['rules']['nations']
+            nation_key = str(nation_id)  # Nations dict uses string keys
+            if nation_key in nations:
+                return nations[nation_key].get('name', '')
+        return ''
+
     def _get_player_name(self, player_id: int, state: Dict) -> str:
-        """Get player name from state
+        """Get player display name from state
+
+        Returns player name with civilization name if available.
+        Format: "Player Name (Civilization)" or just "Player Name" if civ unknown.
 
         Args:
             player_id: Player ID
             state: Game state dict
 
         Returns:
-            Player name or default
+            Player display name
         """
         players = self._get_player_info(state)
         if player_id in players and isinstance(players[player_id], dict):
-            return players[player_id].get('name', f'Player {player_id}')
+            player = players[player_id]
+            player_name = player.get('name', f'Player {player_id}')
+
+            # Try to get civilization name
+            nation_id = player.get('nation')
+            if nation_id is not None:
+                civ_name = self._get_nation_name(nation_id, state)
+                if civ_name:
+                    return f"{player_name} ({civ_name})"
+
+            return player_name
         return f'Player {player_id}'
 
     def _format_html_table(

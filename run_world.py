@@ -39,6 +39,10 @@ import time
 fc_args['username'] = 'myagent2'
 fc_args['debug.record_action_and_observation'] = True
 
+# Game Configuration
+MAX_TURNS = 100  # Maximum number of turns for the game
+fc_args['max_turns'] = MAX_TURNS
+
 # AI Configuration
 # NOTE: aifill sets TOTAL number of players in game (not additional AI opponents)
 # So aifill=5 creates 4 AI players + 1 connected player = 5 total
@@ -51,6 +55,7 @@ def main():
     print(f"Username: {fc_args['username']} (will be toggled to AI control)")
     print(f"AI Players: {NUM_AI_PLAYERS} total (all Freeciv AI at {AI_DIFFICULTY} difficulty)")
     print(f"Setup: {NUM_AI_PLAYERS - 1} via aifill + 1 connected player toggled to AI")
+    print(f"Max turns: {MAX_TURNS}")
     print(f"Recording to: logs/recordings/{fc_args['username']}/")
     print()
 
@@ -76,10 +81,9 @@ def main():
 
     done = False
     step = 0
-    max_turns = 100
 
     print(f"Game started - all {NUM_AI_PLAYERS} players controlled by Freeciv AI")
-    print(f"Running for {max_turns} turns (AI vs AI competitive game)")
+    print(f"Running for up to {MAX_TURNS} turns (AI vs AI competitive game)")
     print()
 
     while not done:
@@ -90,10 +94,11 @@ def main():
 
             turn = info.get('turn', 0)
             if turn > 0 and turn % 10 == 0:
-                print(f"Turn {turn}/{max_turns}")
+                print(f"Turn {turn}/{MAX_TURNS}")
 
             step += 1
-            done = terminated or truncated or turn >= max_turns
+            # Environment will set terminated=True when max_turns is reached
+            done = terminated or truncated
 
         except Exception as e:
             print(f"Error: {e}")
@@ -119,8 +124,8 @@ def main():
         # Output: where to save the report
         output_dir='reports/latest_game/',
 
-        # Generate reports at turns 10, 25, and 50
-        report_turns=[100],
+        # Generate report at the final turn
+        report_turns=[MAX_TURNS],
 
         # Enable all implemented sections
         enabled_sections=['overview', 'historical_events', 'economics', 'demographics', 'technology'],

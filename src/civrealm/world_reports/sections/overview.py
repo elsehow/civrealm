@@ -58,7 +58,8 @@ class OverviewSection(BaseSection):
                 if isinstance(player, dict):
                     # Convert to int for consistent handling
                     pid_int = int(player_id) if isinstance(player_id, str) else player_id
-                    name = player.get('name', f'Player {pid_int}')
+                    # Use helper method to get name with civilization
+                    name = self._get_player_name(pid_int, last_state)
                     score = player.get('score', 0)
                     player_list.append((name, score))
 

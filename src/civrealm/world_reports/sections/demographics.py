@@ -44,7 +44,8 @@ class DemographicsSection(BaseSection):
         if 'player' in first_state:
             for pid, player in first_state['player'].items():
                 if isinstance(player, dict):
-                    player_names[int(pid)] = player.get('name', f'Player {pid}')
+                    pid_int = int(pid)
+                    player_names[pid_int] = self._get_player_name(pid_int, first_state)
 
         html_parts.append('<h2>5. Social Characteristics</h2>')
         html_parts.append('<h3>5.1 Demographics</h3>')
