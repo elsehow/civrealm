@@ -56,7 +56,7 @@ class EventDetector:
             for city_id, city in curr_cities.items():
                 if isinstance(city, dict):
                     events.append(self._create_city_founded_event(
-                        city_id, city, turn, is_initial=True
+                        city_id, city, curr_state, turn, is_initial=True
                     ))
             return events
 
@@ -68,7 +68,7 @@ class EventDetector:
             city = curr_cities[city_id]
             if isinstance(city, dict):
                 events.append(self._create_city_founded_event(
-                    city_id, city, turn, is_initial=False
+                    city_id, city, curr_state, turn, is_initial=False
                 ))
 
         # Detect conquered cities (owner changed)
@@ -82,7 +82,7 @@ class EventDetector:
 
                 if prev_owner is not None and curr_owner is not None and prev_owner != curr_owner:
                     events.append(self._create_city_conquered_event(
-                        city_id, prev_city, curr_city, turn
+                        city_id, prev_city, curr_city, prev_state, curr_state, turn
                     ))
 
         # Detect destroyed cities (disappeared)
@@ -91,7 +91,7 @@ class EventDetector:
             city = prev_cities[city_id]
             if isinstance(city, dict):
                 events.append(self._create_city_destroyed_event(
-                    city_id, city, turn
+                    city_id, city, prev_state, turn
                 ))
 
         return events
@@ -278,23 +278,48 @@ class EventDetector:
         events.extend(self.detect_diplomatic_changes(prev_state, curr_state, turn))
         return events
 
+    def _get_player_name(self, state: Dict, player_id: int) -> str:
+        """Get player name from state
+
+        Args:
+            state: Game state dictionary
+            player_id: Player ID (as int or str)
+
+        Returns:
+            Player name or "Player {id}" as fallback
+        """
+        if not state or 'player' not in state:
+            return f'Player {player_id}'
+
+        players = state['player']
+        player_id_str = str(player_id)
+
+        if player_id_str in players:
+            player = players[player_id_str]
+            if isinstance(player, dict):
+                return player.get('name', f'Player {player_id}')
+
+        return f'Player {player_id}'
+
     def _create_city_founded_event(
         self,
         city_id: str,
         city: Dict,
+        state: Dict,
         turn: int,
         is_initial: bool
     ) -> GameEvent:
         """Create a city founded event"""
         city_name = city.get('name', f'City {city_id}')
         owner = city.get('owner', 0)
+        owner_name = self._get_player_name(state, owner)
         x = city.get('x', 0)
         y = city.get('y', 0)
 
         if is_initial:
-            description = f"Initial city: {city_name} (Player {owner})"
+            description = f"Initial city: {city_name} ({owner_name})"
         else:
-            description = f"{city_name} founded by Player {owner}"
+            description = f"{city_name} founded by {owner_name}"
 
         return GameEvent(
             turn=turn,
@@ -310,16 +335,20 @@ class EventDetector:
         city_id: str,
         prev_city: Dict,
         curr_city: Dict,
+        prev_state: Dict,
+        curr_state: Dict,
         turn: int
     ) -> GameEvent:
         """Create a city conquered event"""
         city_name = curr_city.get('name', f'City {city_id}')
         prev_owner = prev_city.get('owner', 0)
         new_owner = curr_city.get('owner', 0)
+        prev_owner_name = self._get_player_name(prev_state, prev_owner)
+        new_owner_name = self._get_player_name(curr_state, new_owner)
         x = curr_city.get('x', 0)
         y = curr_city.get('y', 0)
 
-        description = f"{city_name} conquered by Player {new_owner} from Player {prev_owner}"
+        description = f"{city_name} conquered by {new_owner_name} from {prev_owner_name}"
 
         return GameEvent(
             turn=turn,
@@ -339,15 +368,17 @@ class EventDetector:
         self,
         city_id: str,
         city: Dict,
+        state: Dict,
         turn: int
     ) -> GameEvent:
         """Create a city destroyed event"""
         city_name = city.get('name', f'City {city_id}')
         owner = city.get('owner', 0)
+        owner_name = self._get_player_name(state, owner)
         x = city.get('x', 0)
         y = city.get('y', 0)
 
-        description = f"{city_name} (Player {owner}) was destroyed"
+        description = f"{city_name} ({owner_name}) was destroyed"
 
         return GameEvent(
             turn=turn,

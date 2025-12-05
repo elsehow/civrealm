@@ -75,9 +75,10 @@ class OverviewSection(BaseSection):
         # Map info
         map_state = last_state.get('map', {})
         if map_state:
-            xsize = map_state.get('xsize', 'Unknown')
-            ysize = map_state.get('ysize', 'Unknown')
-            html_parts.append(f'<p><strong>Map Size:</strong> {xsize} × {ysize}</p>')
+            xsize = map_state.get('xsize')
+            ysize = map_state.get('ysize')
+            if xsize is not None and ysize is not None:
+                html_parts.append(f'<p><strong>Map Size:</strong> {xsize} × {ysize}</p>')
 
         html_parts.append('</div>')
 
