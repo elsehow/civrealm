@@ -40,7 +40,7 @@ fc_args['username'] = 'myagent2'
 fc_args['debug.record_action_and_observation'] = True
 
 # Game Configuration
-MAX_TURNS = 5  # Maximum number of turns for the game
+MAX_TURNS = 250
 fc_args['max_turns'] = MAX_TURNS
 
 # AI Configuration

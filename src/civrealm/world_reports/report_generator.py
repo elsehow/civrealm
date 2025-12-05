@@ -28,7 +28,7 @@ class ReportGenerator:
         """
         self.config = config
         self.data_loader = DataLoader(config.recording_dir)
-        self.visualizer = MapVisualizer(dpi=config.dpi, style=config.plot_style)
+        self.visualizer = MapVisualizer(dpi=config.dpi, style=config.plot_style, data_loader=self.data_loader)
 
         # Map section names to section classes
         self.available_sections = {

@@ -50,14 +50,16 @@ TERRAIN_COLORS_BY_ID = {
 class MapVisualizer:
     """Generate map visualizations from game state data"""
 
-    def __init__(self, dpi: int = 150, style: str = 'seaborn'):
+    def __init__(self, dpi: int = 150, style: str = 'seaborn', data_loader=None):
         """Initialize visualizer
 
         Args:
             dpi: Resolution for generated images
             style: Matplotlib style to use
+            data_loader: Optional DataLoader instance for accessing ruleset data
         """
         self.dpi = dpi
+        self.data_loader = data_loader
         try:
             plt.style.use(style)
         except:
@@ -376,7 +378,23 @@ class MapVisualizer:
                 pid_int = int(player_id) if isinstance(player_id, str) else player_id
                 if pid_int < len(PLAYER_COLORS):
                     player = player_state[player_id]
-                    name = player.get('name', f'Player {pid_int}')
+
+                    # Try to get civilization name first
+                    name = None
+                    if self.data_loader and self.data_loader.ruleset:
+                        nation_id = player.get('nation')
+                        if nation_id is not None and 'nations' in self.data_loader.ruleset:
+                            nations = self.data_loader.ruleset['nations']
+                            nation_key = str(nation_id)
+                            if nation_key in nations:
+                                nation = nations[nation_key]
+                                # Try adjective first, then rule_name
+                                name = nation.get('adjective') or nation.get('rule_name')
+
+                    # Fall back to player name if civilization name not found
+                    if not name:
+                        name = player.get('name', f'Player {pid_int}')
+
                     color = PLAYER_COLORS[pid_int]
                     patches.append(mpatches.Patch(color=color, label=name))
 
