@@ -27,9 +27,14 @@ class GameEvent:
 class EventDetector:
     """Detect events by comparing consecutive game states"""
 
-    def __init__(self):
-        """Initialize event detector"""
+    def __init__(self, data_loader=None):
+        """Initialize event detector
+
+        Args:
+            data_loader: Optional DataLoader instance for accessing ruleset data
+        """
         self.events: List[GameEvent] = []
+        self.data_loader = data_loader
 
     def detect_city_events(
         self,
@@ -279,14 +284,14 @@ class EventDetector:
         return events
 
     def _get_player_name(self, state: Dict, player_id: int) -> str:
-        """Get player name from state
+        """Get player civilization name from state
 
         Args:
             state: Game state dictionary
             player_id: Player ID (as int or str)
 
         Returns:
-            Player name or "Player {id}" as fallback
+            Civilization name, falling back to player name if not found
         """
         if not state or 'player' not in state:
             return f'Player {player_id}'
@@ -297,6 +302,20 @@ class EventDetector:
         if player_id_str in players:
             player = players[player_id_str]
             if isinstance(player, dict):
+                # Try to get civilization name first
+                if self.data_loader and self.data_loader.ruleset:
+                    nation_id = player.get('nation')
+                    if nation_id is not None and 'nations' in self.data_loader.ruleset:
+                        nations = self.data_loader.ruleset['nations']
+                        nation_key = str(nation_id)
+                        if nation_key in nations:
+                            nation = nations[nation_key]
+                            # Try adjective first, then rule_name
+                            civ_name = nation.get('adjective') or nation.get('rule_name')
+                            if civ_name:
+                                return civ_name
+
+                # Fall back to player name
                 return player.get('name', f'Player {player_id}')
 
         return f'Player {player_id}'

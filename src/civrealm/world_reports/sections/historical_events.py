@@ -101,7 +101,7 @@ class HistoricalEventsSection(BaseSection):
         Returns:
             SectionData with events table and mini-maps
         """
-        detector = EventDetector()
+        detector = EventDetector(data_loader)
         all_events: List[GameEvent] = []
 
         # Sort turns
@@ -200,7 +200,7 @@ class HistoricalEventsSection(BaseSection):
                 for pid, player in first_state['player'].items():
                     if isinstance(player, dict):
                         pid_int = int(pid)
-                        player_names[pid_int] = self._get_player_name(pid_int, first_state)
+                        player_names[pid_int] = self._get_player_name(pid_int, first_state, data_loader)
 
             # Calculate territory data for all turns
             territory_data = {}  # {turn: {player_id: tiles}}
@@ -262,7 +262,7 @@ class HistoricalEventsSection(BaseSection):
             tech_rows = []
             for event in tech_events[:20]:  # Limit to first 20
                 turn_str = f"Turn {event.turn}"
-                player_name = self._get_player_name(event.player_id, states.get(event.turn, {}))
+                player_name = self._get_player_name(event.player_id, states.get(event.turn, {}), data_loader)
                 tech_rows.append([turn_str, player_name, event.description])
 
             tech_table = self._format_html_table(

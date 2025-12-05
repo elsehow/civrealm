@@ -69,49 +69,63 @@ class BaseSection(ABC):
         """
         return state.get('player', {})
 
-    def _get_nation_name(self, nation_id: int, state: Dict) -> str:
+    def _get_nation_name(self, nation_id: int, data_loader: Any) -> str:
         """Get nation/civilization name from nation ID
 
         Args:
             nation_id: Nation ID
-            state: Game state dict
+            data_loader: DataLoader instance with ruleset data
 
         Returns:
             Nation name or empty string if not found
         """
-        if 'rules' in state and 'nations' in state['rules']:
-            nations = state['rules']['nations']
+        if data_loader.ruleset and 'nations' in data_loader.ruleset:
+            nations = data_loader.ruleset['nations']
             nation_key = str(nation_id)  # Nations dict uses string keys
             if nation_key in nations:
-                return nations[nation_key].get('name', '')
+                nation = nations[nation_key]
+                # Try adjective first (e.g., "Abkhaz"), then rule_name as fallback
+                return nation.get('adjective') or nation.get('rule_name', '')
         return ''
 
-    def _get_player_name(self, player_id: int, state: Dict) -> str:
-        """Get player display name from state
+    def _get_player_name(self, player_id: int, state: Dict, data_loader: Any) -> str:
+        """Get civilization name for a player
 
-        Returns player name with civilization name if available.
-        Format: "Player Name (Civilization)" or just "Player Name" if civ unknown.
+        Returns the civilization/nation name. Falls back to player name
+        if civilization is unknown.
 
         Args:
             player_id: Player ID
             state: Game state dict
+            data_loader: DataLoader instance with ruleset data
 
         Returns:
-            Player display name
+            Civilization name or player name as fallback
         """
         players = self._get_player_info(state)
-        if player_id in players and isinstance(players[player_id], dict):
-            player = players[player_id]
-            player_name = player.get('name', f'Player {player_id}')
 
-            # Try to get civilization name
+        # Handle both int and string player IDs
+        if isinstance(player_id, str):
+            player_id = int(player_id)
+
+        # Try to find player by int or string key
+        player = None
+        if player_id in players:
+            player = players[player_id]
+        elif str(player_id) in players:
+            player = players[str(player_id)]
+
+        if player and isinstance(player, dict):
+            # Try to get civilization name first
             nation_id = player.get('nation')
             if nation_id is not None:
-                civ_name = self._get_nation_name(nation_id, state)
+                civ_name = self._get_nation_name(nation_id, data_loader)
                 if civ_name:
-                    return f"{player_name} ({civ_name})"
+                    return civ_name
 
-            return player_name
+            # Fall back to player name
+            return player.get('name', f'Player {player_id}')
+
         return f'Player {player_id}'
 
     def _format_html_table(

@@ -28,6 +28,9 @@ class DataLoader:
         self._state_index: Dict[int, List[Tuple[int, Path]]] = defaultdict(list)
         self._build_index()
 
+        # Load ruleset data (nations, etc.)
+        self.ruleset = self._load_ruleset()
+
     def _build_index(self):
         """Build index of all state files by turn and step"""
         pattern = re.compile(r'turn_(\d+)_step_(\d+)_state\.json')
@@ -42,6 +45,20 @@ class DataLoader:
         # Sort steps within each turn
         for turn in self._state_index:
             self._state_index[turn].sort(key=lambda x: x[0])
+
+    def _load_ruleset(self) -> Optional[Dict]:
+        """Load ruleset data (nations, etc.) from recording directory
+
+        Returns:
+            Dict containing ruleset data, or None if not found
+        """
+        ruleset_file = self.recording_dir / 'ruleset.json'
+        if ruleset_file.exists():
+            return self._load_json(ruleset_file)
+        else:
+            print(f"Warning: No ruleset.json found in {self.recording_dir}")
+            print("Civilization names will not be available in reports.")
+            return None
 
     def get_available_turns(self) -> List[int]:
         """Get list of all turns that have recorded states

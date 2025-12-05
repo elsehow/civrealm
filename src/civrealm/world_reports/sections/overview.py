@@ -59,7 +59,7 @@ class OverviewSection(BaseSection):
                     # Convert to int for consistent handling
                     pid_int = int(player_id) if isinstance(player_id, str) else player_id
                     # Use helper method to get name with civilization
-                    name = self._get_player_name(pid_int, last_state)
+                    name = self._get_player_name(pid_int, last_state, data_loader)
                     score = player.get('score', 0)
                     player_list.append((name, score))
 

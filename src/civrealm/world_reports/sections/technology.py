@@ -44,7 +44,8 @@ class TechnologySection(BaseSection):
         if 'player' in first_state:
             for pid, player in first_state['player'].items():
                 if isinstance(player, dict):
-                    player_names[int(pid)] = player.get('name', f'Player {pid}')
+                    pid_int = int(pid)
+                    player_names[pid_int] = self._get_player_name(pid_int, first_state, data_loader)
 
         html_parts.append('<h2>6. Science and Technology</h2>')
 
