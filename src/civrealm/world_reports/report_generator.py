@@ -11,6 +11,9 @@ from .utils.visualizations import MapVisualizer
 from .sections.base_section import BaseSection, SectionData
 from .sections.overview import OverviewSection
 from .sections.historical_events import HistoricalEventsSection
+from .sections.economics import EconomicsSection
+from .sections.demographics import DemographicsSection
+from .sections.technology import TechnologySection
 from .renderers.html import HTMLRenderer
 
 
@@ -31,11 +34,11 @@ class ReportGenerator:
         self.available_sections = {
             'overview': OverviewSection,
             'historical_events': HistoricalEventsSection,
+            'economics': EconomicsSection,
+            'demographics': DemographicsSection,
+            'technology': TechnologySection,
             # Add more sections as implemented
             # 'politics': PoliticsSection,
-            # 'economics': EconomicsSection,
-            # 'social': SocialSection,
-            # 'technology': TechnologySection,
         }
 
     def generate_reports(self):

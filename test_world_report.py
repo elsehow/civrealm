@@ -26,10 +26,10 @@ def main():
         output_dir='reports/test_game_fullterrain/',
 
         # Generate reports at turns 10, 25, 30 (32 is latest so far)
-        report_turns=[10, 25, 30],
+        report_turns=[10, 25, 50],
 
         # Enable the sections we've implemented
-        enabled_sections=['overview', 'historical_events'],
+        enabled_sections=['overview', 'historical_events', 'economics', 'demographics', 'technology'],
 
         # Output formats
         formats=['html'],  # Start with HTML only

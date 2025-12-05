@@ -6,6 +6,7 @@ Tracks city founding, conquests, and other major events throughout the game.
 from typing import Dict, List
 from .base_section import BaseSection, SectionData
 from ..utils.event_detector import EventDetector, GameEvent
+from ..utils import metrics, graphs
 
 
 class HistoricalEventsSection(BaseSection):
@@ -114,6 +115,68 @@ class HistoricalEventsSection(BaseSection):
                         print(f"Warning: Failed to generate territory map for turn {turn}: {e}")
 
                 html_parts.append('</div>')
+
+            # Generate territory and arable land graphs
+            html_parts.append('<h4>Territorial Expansion Over Time</h4>')
+
+            # Get player names
+            first_state = states[sorted_turns[0]] if sorted_turns else {}
+            player_names = {}
+            if 'player' in first_state:
+                for pid, player in first_state['player'].items():
+                    if isinstance(player, dict):
+                        player_names[int(pid)] = player.get('name', f'Player {pid}')
+
+            # Calculate territory data for all turns
+            territory_data = {}  # {turn: {player_id: tiles}}
+            arable_data = {}     # {turn: {player_id: arable_tiles}}
+
+            for turn in sorted_turns:
+                state = states[turn]
+                territory_data[turn] = {}
+                arable_data[turn] = {}
+
+                if 'player' in state:
+                    for pid_str in state['player'].keys():
+                        pid = int(pid_str)
+                        territory_data[turn][pid] = metrics.calculate_territory_size(state, pid)
+                        arable_data[turn][pid] = metrics.calculate_arable_land(state, pid)
+
+            # Generate territory size graph
+            if territory_data:
+                try:
+                    img_buf = graphs.create_time_series_graph(
+                        data=territory_data,
+                        title='Territorial Extent Over Time',
+                        ylabel='Tiles Controlled',
+                        player_names=player_names,
+                        dpi=config.dpi if hasattr(config, 'dpi') else 150
+                    )
+                    img_name = 'territory_size_over_time'
+                    images[img_name] = img_buf
+                    html_parts.append(f'<div class="graph">')
+                    html_parts.append(f'<img src="{img_name}.png" alt="Territory size over time"/>')
+                    html_parts.append('</div>')
+                except Exception as e:
+                    print(f"Warning: Failed to generate territory size graph: {e}")
+
+            # Generate arable land graph
+            if arable_data:
+                try:
+                    img_buf = graphs.create_time_series_graph(
+                        data=arable_data,
+                        title='Arable Land Controlled Over Time',
+                        ylabel='Arable Tiles Controlled',
+                        player_names=player_names,
+                        dpi=config.dpi if hasattr(config, 'dpi') else 150
+                    )
+                    img_name = 'arable_land_over_time'
+                    images[img_name] = img_buf
+                    html_parts.append(f'<div class="graph">')
+                    html_parts.append(f'<img src="{img_name}.png" alt="Arable land over time"/>')
+                    html_parts.append('</div>')
+                except Exception as e:
+                    print(f"Warning: Failed to generate arable land graph: {e}")
 
         # Technology and government events
         tech_events = [e for e in all_events if e.event_type == 'tech_discovered']

@@ -53,7 +53,7 @@ class ReportConfig:
 
         valid_sections = {
             'overview', 'historical_events', 'politics',
-            'economics', 'social', 'technology'
+            'economics', 'demographics', 'social', 'technology'
         }
         invalid = set(self.enabled_sections) - valid_sections
         if invalid:
