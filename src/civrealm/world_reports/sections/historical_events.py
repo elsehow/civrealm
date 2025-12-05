@@ -9,6 +9,74 @@ from ..utils.event_detector import EventDetector, GameEvent
 from ..utils import metrics, graphs
 
 
+def select_snapshot_turns(max_turn: int, max_snapshots: int = 5,
+                         min_turn: int = 5, min_spacing: int = 10) -> List[int]:
+    """
+    Select snapshot turns for territorial maps using backward selection with adaptive spacing.
+
+    Args:
+        max_turn: The latest turn in the report
+        max_snapshots: Maximum number of snapshots to include (default: 5)
+        min_turn: Earliest turn to consider (default: 5, avoids empty early game)
+        min_spacing: Minimum turns between snapshots to avoid clustering (default: 10)
+
+    Strategy:
+    - Start from max_turn (most recent)
+    - Work backwards with adaptive spacing
+    - Spacing = max(min_spacing, available_range / (max_snapshots - 1))
+      This ensures:
+        * Long games: wider spacing (e.g., 500 turns → ~100 turn gaps)
+        * Short games: minimum spacing (e.g., 40 turns → 10 turn gaps)
+        * Very short games: fewer maps returned (acceptable per requirements)
+    - Stops when reaching min_turn or max_snapshots limit
+
+    Examples:
+        max_turn=100 → [12, 35, 58, 81, 100] (spacing ~23)
+        max_turn=50  → [6, 17, 28, 39, 50]   (spacing ~11)
+        max_turn=30  → [10, 20, 30]          (spacing 10, only 3 maps - acceptable)
+        max_turn=15  → [15]                  (only 1 map - game too short)
+
+    Returns:
+        Sorted list of turn numbers for snapshot generation
+    """
+    # Edge cases: game too short
+    if max_turn < min_turn:
+        return []
+
+    if max_turn == min_turn:
+        return [min_turn]
+
+    # Calculate adaptive spacing
+    # available_range: number of turns between min and max
+    available_range = max_turn - min_turn
+
+    # Ideal spacing to fit max_snapshots evenly across the range
+    # Example: 95 turns with 5 snapshots → 95/4 = 23 turns apart
+    ideal_spacing = available_range // (max_snapshots - 1) if max_snapshots > 1 else available_range
+
+    # Use the larger of min_spacing or ideal_spacing
+    # This ensures we don't cluster maps too closely in short games
+    spacing = max(min_spacing, ideal_spacing)
+
+    # Build snapshot list working backwards from max_turn
+    snapshots = [max_turn]
+    current = max_turn
+
+    while len(snapshots) < max_snapshots:
+        next_turn = current - spacing
+
+        if next_turn < min_turn:
+            # Check if we can squeeze in one more snapshot at min_turn
+            if min_turn not in snapshots and (current - min_turn) >= min_spacing:
+                snapshots.append(min_turn)
+            break
+
+        snapshots.append(next_turn)
+        current = next_turn
+
+    return sorted(snapshots)
+
+
 class HistoricalEventsSection(BaseSection):
     """Generate historical events section"""
 
@@ -86,9 +154,15 @@ class HistoricalEventsSection(BaseSection):
         if states:
             html_parts.append('<h3>2.2 Territorial Control</h3>')
 
-            # Generate territory maps at key turns
+            # Generate territory maps at key turns using adaptive selection
             max_turn = max(states.keys())
-            snapshot_turns = [1, max_turn // 2, max_turn]
+            snapshot_turns = select_snapshot_turns(
+                max_turn=max_turn,
+                max_snapshots=5,
+                min_turn=5,
+                min_spacing=10
+            )
+            # Filter to only turns we have state data for
             snapshot_turns = [t for t in snapshot_turns if t in states]
 
             if snapshot_turns:

@@ -6,10 +6,11 @@ by Freeciv's built-in AI, then automatically generates world reports from the
 recorded gameplay.
 
 Setup:
-- Connects as 1 player (myagent2) with NoOpAgent
-- Toggles that player to Freeciv AI control via /aitoggle
-- Adds 4 additional AI players via aifill
-- Total: 5 Freeciv AI players, ALL using the same strategy
+- Sets aifill=5 to create 5 total players in the game
+- Connects as player 'myagent2' (1 of the 5)
+- Toggles myagent2 to Freeciv AI control via /aitoggle
+- The other 4 players are AI-controlled by default
+- Result: 5 Freeciv AI players, ALL using the same strategy
 
 NoOpAgent's role:
 - Simply returns None to end turn immediately
@@ -39,15 +40,17 @@ fc_args['username'] = 'myagent2'
 fc_args['debug.record_action_and_observation'] = True
 
 # AI Configuration
-NUM_AI_PLAYERS = 4  # Number of AI opponents
+# NOTE: aifill sets TOTAL number of players in game (not additional AI opponents)
+# So aifill=5 creates 4 AI players + 1 connected player = 5 total
+NUM_AI_PLAYERS = 5  # TOTAL players in game
 AI_DIFFICULTY = 'hard'  # Options: 'handicapped', 'novice', 'easy', 'normal', 'hard', 'cheating', 'experimental'
 fc_args['aifill'] = NUM_AI_PLAYERS
 
 def main():
     print("Starting all-AI game collection...")
     print(f"Username: {fc_args['username']} (will be toggled to AI control)")
-    print(f"AI Players: {NUM_AI_PLAYERS + 1} total (all Freeciv AI at {AI_DIFFICULTY} difficulty)")
-    print(f"Setup: {NUM_AI_PLAYERS} via aifill + 1 connected player toggled to AI")
+    print(f"AI Players: {NUM_AI_PLAYERS} total (all Freeciv AI at {AI_DIFFICULTY} difficulty)")
+    print(f"Setup: {NUM_AI_PLAYERS - 1} via aifill + 1 connected player toggled to AI")
     print(f"Recording to: logs/recordings/{fc_args['username']}/")
     print()
 
@@ -63,16 +66,19 @@ def main():
     time.sleep(1)
 
     # Toggle the connected player to be AI-controlled by Freeciv's built-in AI
-    # This makes ALL players in the game controlled by Freeciv AI
     print(f"Toggling {fc_args['username']} to Freeciv AI control...")
     env.civ_controller.ws_client.send_message(f"/aitoggle {fc_args['username']}")
     time.sleep(1)
 
+    # Aifill players are already AI-controlled by default (PLRF_AI flag set)
+    # DO NOT toggle them - that would turn OFF their AI!
+    print(f"All {NUM_AI_PLAYERS - 1} aifill players are AI-controlled by default")
+
     done = False
     step = 0
-    max_turns = 50
+    max_turns = 100
 
-    print(f"Game started - all {NUM_AI_PLAYERS + 1} players controlled by Freeciv AI")
+    print(f"Game started - all {NUM_AI_PLAYERS} players controlled by Freeciv AI")
     print(f"Running for {max_turns} turns (AI vs AI competitive game)")
     print()
 
@@ -114,7 +120,7 @@ def main():
         output_dir='reports/latest_game/',
 
         # Generate reports at turns 10, 25, and 50
-        report_turns=[10, 25, 50],
+        report_turns=[100],
 
         # Enable all implemented sections
         enabled_sections=['overview', 'historical_events', 'economics', 'demographics', 'technology'],
