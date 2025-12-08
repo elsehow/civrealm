@@ -8,12 +8,7 @@ matplotlib.use('Agg')  # Non-interactive backend
 from .config import ReportConfig
 from .data_loader import DataLoader
 from .utils.visualizations import MapVisualizer
-from .sections.base_section import BaseSection, SectionData
-from .sections.overview import OverviewSection
-from .sections.historical_events import HistoricalEventsSection
-from .sections.economics import EconomicsSection
-from .sections.demographics import DemographicsSection
-from .sections.technology import TechnologySection
+from .extractors import MetricsCollector, write_world_data, read_world_data
 from .renderers.html import HTMLRenderer
 
 
@@ -29,17 +24,6 @@ class ReportGenerator:
         self.config = config
         self.data_loader = DataLoader(config.recording_dir)
         self.visualizer = MapVisualizer(dpi=config.dpi, style=config.plot_style, data_loader=self.data_loader)
-
-        # Map section names to section classes
-        self.available_sections = {
-            'overview': OverviewSection,
-            'historical_events': HistoricalEventsSection,
-            'economics': EconomicsSection,
-            'demographics': DemographicsSection,
-            'technology': TechnologySection,
-            # Add more sections as implemented
-            # 'politics': PoliticsSection,
-        }
 
     def generate_reports(self):
         """Generate reports for all configured turns
@@ -82,8 +66,32 @@ class ReportGenerator:
     def generate_report_for_turn(self, turn: int):
         """Generate a single report covering turns 0 to turn
 
+        Uses two-stage pipeline: data extraction → JSON → HTML rendering
+
         Args:
             turn: Target turn number (report covers 0 to turn inclusive)
+        """
+        # Stage 1: Extract data to JSON
+        json_file = f"{self.config.output_dir}/turn_{turn:03d}_data.json"
+        print(f"  Stage 1: Extracting data...")
+        self.generate_data(turn, json_file)
+
+        # Stage 2: Render HTML from JSON
+        print(f"  Stage 2: Rendering HTML...")
+        html_file = self.render_from_json(json_file)
+
+        print(f"    JSON: {json_file}")
+        print(f"    HTML: {html_file}")
+
+    def generate_data(self, turn: int, output_file: str = None) -> Dict:
+        """Stage 1: Extract data and save to JSON
+
+        Args:
+            turn: Target turn number (report covers 0 to turn inclusive)
+            output_file: Optional path to save JSON file
+
+        Returns:
+            World report data dictionary
         """
         # Load all states from turn 0 to target turn
         states = self.data_loader.get_states_range(0, turn)
@@ -91,38 +99,47 @@ class ReportGenerator:
         if not states:
             raise ValueError(f"No data available for turns 0 to {turn}")
 
-        # Generate sections
-        sections = []
-        for section_name in self.config.enabled_sections:
-            if section_name not in self.available_sections:
-                print(f"  Warning: Section '{section_name}' not implemented yet, skipping")
-                continue
+        # Collect metrics
+        collector = MetricsCollector()
+        data = collector.collect_all(
+            states=states,
+            config=self.config,
+            data_loader=self.data_loader
+        )
 
-            section_class = self.available_sections[section_name]
-            section_instance = section_class()
+        # Save to JSON if output file specified
+        if output_file:
+            write_world_data(data, output_file)
 
-            print(f"  Generating section: {section_name}...")
-            section_data = section_instance.generate(
-                states=states,
-                config=self.config,
-                data_loader=self.data_loader,
-                visualizer=self.visualizer
-            )
-            sections.append(section_data)
+        return data
 
-        # Render outputs
-        for fmt in self.config.formats:
-            if fmt == 'html':
-                print(f"  Rendering HTML...")
-                renderer = HTMLRenderer(self.config.output_dir, turn)
-                output_file = renderer.render(sections)
-                print(f"    Saved: {output_file}")
-            elif fmt == 'pdf':
-                print(f"  PDF rendering not yet implemented, skipping")
-                # TODO: Implement PDF renderer
-            elif fmt == 'markdown':
-                print(f"  Markdown rendering not yet implemented, skipping")
-                # TODO: Implement Markdown renderer
+    def render_from_json(self, json_file: str, output_file: str = None) -> str:
+        """Stage 2: Render HTML from JSON
+
+        Args:
+            json_file: Path to world report JSON file
+            output_file: Optional path for output HTML file
+
+        Returns:
+            Path to generated HTML file
+        """
+        # Read JSON data
+        data = read_world_data(json_file)
+
+        # Create renderer with visualizer for territory maps
+        turn = data['metadata']['turn']
+        renderer = HTMLRenderer(
+            output_dir=self.config.output_dir,
+            turn=turn,
+            recording_dir=self.config.recording_dir,
+            data_loader=self.data_loader,
+            visualizer=self.visualizer
+        )
+
+        # Render HTML
+        html_file = renderer.render_from_json(data, output_file)
+
+        return html_file
 
     def get_section_list(self) -> List[str]:
         """Get list of available section names
@@ -130,7 +147,13 @@ class ReportGenerator:
         Returns:
             List of section names
         """
-        return list(self.available_sections.keys())
+        return [
+            'overview',
+            'historical_events',
+            'economics',
+            'demographics',
+            'technology'
+        ]
 
     def validate_config(self) -> bool:
         """Validate configuration and check data availability
