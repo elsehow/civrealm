@@ -36,7 +36,9 @@ import gymnasium
 import time
 
 # Configuration
-fc_args['username'] = 'myagent2'
+# this username is for authenticating to the game server
+# we pull the civilization name for world reports
+fc_args['username'] = 'myagent2' 
 fc_args['debug.record_action_and_observation'] = True
 
 # Game Configuration
