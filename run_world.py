@@ -38,11 +38,11 @@ import time
 # Configuration
 # this username is for authenticating to the game server
 # we pull the civilization name for world reports
-fc_args['username'] = 'myagent2' 
+fc_args['username'] = 'myagent2'
 fc_args['debug.record_action_and_observation'] = True
 
 # Game Configuration
-MAX_TURNS = 250
+MAX_TURNS = 50
 fc_args['max_turns'] = MAX_TURNS
 
 # AI Configuration
@@ -71,6 +71,17 @@ def main():
     print(f"Setting AI difficulty to {AI_DIFFICULTY}...")
     env.civ_controller.ws_client.send_message(f"/set skilllevel {AI_DIFFICULTY}")
     time.sleep(1)
+
+    # NOTE: phasemode=PLAYER doesn't work with singleplayer + NoOpAgent setup
+    # It causes the game to hang waiting for explicit turn control
+    # In singleplayer mode, Freeciv uses concurrent turns with built-in randomization
+    # which helps mitigate first-mover advantage automatically
+
+    # Randomize starting position assignments to balance the game
+    # teamplacement=DISABLED assigns starting positions randomly rather than by team
+    print("Randomizing starting positions...")
+    env.civ_controller.ws_client.send_message("/set teamplacement DISABLED")
+    time.sleep(0.5)
 
     # Toggle the connected player to be AI-controlled by Freeciv's built-in AI
     print(f"Toggling {fc_args['username']} to Freeciv AI control...")
