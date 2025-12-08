@@ -462,7 +462,9 @@ class CivController(CivPropController):
                   "turn": self.rule_ctrl.game_info['turn']}
         self.ws_client.send_request(packet)
         self.turn_manager.end_turn()
-        assert self.ws_client.begin_turn_timeout_handle == None
+        # In observer mode, timing may differ - cancel existing timeout if present
+        if self.ws_client.begin_turn_timeout_handle is not None:
+            self.ws_client.get_ioloop().remove_timeout(self.ws_client.begin_turn_timeout_handle)
         # Add begin_turn timeout handler
         self.ws_client.begin_turn_timeout_handle = self.ws_client.get_ioloop().call_later(
             fc_args['begin_turn_timeout'], self.begin_turn_timeout_callback)

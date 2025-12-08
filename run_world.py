@@ -30,10 +30,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
 from civrealm.configs import fc_args
-from civrealm.agents import NoOpAgent
+from civrealm.agents import NoOpAgent, ObserverAgent
 from civrealm.world_reports import ReportGenerator, ReportConfig
 import gymnasium
 import time
+import threading
 
 # Configuration
 # this username is for authenticating to the game server
@@ -42,8 +43,12 @@ fc_args['username'] = 'myagent2'
 fc_args['debug.record_action_and_observation'] = True
 
 # Game Configuration
-MAX_TURNS = 250
+MAX_TURNS = 50  # Full game with savegame-based complete data extraction
 fc_args['max_turns'] = MAX_TURNS
+
+# Don't wait for observer - let observer join dynamically
+# Observer will connect after game starts
+fc_args['wait_for_observer'] = False
 
 # AI Configuration
 # NOTE: aifill sets TOTAL number of players in game (not additional AI opponents)
@@ -52,6 +57,67 @@ NUM_AI_PLAYERS = 5  # TOTAL players in game
 AI_DIFFICULTY = 'hard'  # Options: 'handicapped', 'novice', 'easy', 'normal', 'hard', 'cheating', 'experimental'
 fc_args['aifill'] = NUM_AI_PLAYERS
 
+
+def run_observer(client_port):
+    """Run observer client to record complete game state
+
+    Observer sees complete state (no fog of war) for all players,
+    enabling accurate world report generation.
+
+    Args:
+        client_port: Port to connect to (same game as player)
+    """
+    print(f"\n[Observer] Starting observer connection...")
+
+    # Temporarily modify fc_args for observer
+    # Save original values
+    original_username = fc_args['username']
+    original_self_play = fc_args['self_play']
+
+    # Set observer-specific values
+    fc_args['username'] = OBSERVER_USERNAME
+    fc_args['self_play'] = True  # Join the same game as player
+
+    # Create observer environment
+    observer_env = gymnasium.make('civrealm/FreecivBase-v0')
+    observer_agent = ObserverAgent()
+
+    # Restore original fc_args
+    fc_args['username'] = original_username
+    fc_args['self_play'] = original_self_play
+
+    try:
+        # Connect to the same game server by passing client_port to reset
+        observations, info = observer_env.reset(client_port=client_port)
+        print(f"[Observer] Connected successfully!")
+
+        # Send /observe command to enter observer mode (see complete game state)
+        print(f"[Observer] Entering observer mode with /observe command...")
+        observer_env.unwrapped.civ_controller.ws_client.send_message("/observe")
+        time.sleep(1)
+        print(f"[Observer] Observer mode active! Recording to: logs/recordings/{OBSERVER_USERNAME}/")
+
+        # Observer loop - just observe, don't take actions
+        done = False
+        while not done:
+            action = observer_agent.act(observations, info)
+            observations, reward, terminated, truncated, info = observer_env.step(action)
+
+            turn = info.get('turn', 0)
+            if turn > 0 and turn % 50 == 0:
+                print(f"[Observer] Recording turn {turn}")
+
+            done = terminated or truncated
+
+        observer_env.close()
+        print("[Observer] Recording complete")
+
+    except Exception as e:
+        print(f"[Observer] Error: {e}")
+        import traceback
+        traceback.print_exc()
+
+
 def main():
     print("Starting all-AI game collection...")
     print(f"Username: {fc_args['username']} (will be toggled to AI control)")
@@ -59,7 +125,7 @@ def main():
     print(f"Setup: {NUM_AI_PLAYERS - 1} via aifill + 1 connected player toggled to AI")
     print(f"Max turns: {MAX_TURNS}")
     print(f"Recording to: logs/recordings/{fc_args['username']}/")
-    print()
+
 
     env = gymnasium.make('civrealm/FreecivBase-v0')
     # NoOpAgent just ends turn - connected player will be toggled to Freeciv AI
@@ -67,9 +133,17 @@ def main():
 
     observations, info = env.reset()
 
+    # Note: Fog of war is disabled in client_state.py set_multiplayer_game()
+    # This ensures complete world data for reports
+
+    # Try entering observer mode to get complete player data
+    print(f"Entering observer mode for complete data access...")
+    env.unwrapped.civ_controller.ws_client.send_message("/observe")
+    time.sleep(1)
+
     # Set AI difficulty level for all AI players
     print(f"Setting AI difficulty to {AI_DIFFICULTY}...")
-    env.civ_controller.ws_client.send_message(f"/set skilllevel {AI_DIFFICULTY}")
+    env.unwrapped.civ_controller.ws_client.send_message(f"/set skilllevel {AI_DIFFICULTY}")
     time.sleep(1)
 
     # NOTE: phasemode=PLAYER doesn't work with singleplayer + NoOpAgent setup
@@ -80,17 +154,21 @@ def main():
     # Randomize starting position assignments to balance the game
     # teamplacement=DISABLED assigns starting positions randomly rather than by team
     print("Randomizing starting positions...")
-    env.civ_controller.ws_client.send_message("/set teamplacement DISABLED")
+    env.unwrapped.civ_controller.ws_client.send_message("/set teamplacement DISABLED")
     time.sleep(0.5)
 
     # Toggle the connected player to be AI-controlled by Freeciv's built-in AI
     print(f"Toggling {fc_args['username']} to Freeciv AI control...")
-    env.civ_controller.ws_client.send_message(f"/aitoggle {fc_args['username']}")
+    env.unwrapped.civ_controller.ws_client.send_message(f"/aitoggle {fc_args['username']}")
     time.sleep(1)
 
     # Aifill players are already AI-controlled by default (PLRF_AI flag set)
     # DO NOT toggle them - that would turn OFF their AI!
     print(f"All {NUM_AI_PLAYERS - 1} aifill players are AI-controlled by default")
+
+    # Start observer in separate thread if enabled (AFTER game setup)
+    observer_thread = None
+
 
     done = False
     step = 0
@@ -117,6 +195,12 @@ def main():
             print(f"Error: {e}")
             raise e
 
+    # Save and preserve the final game state for extracting complete production data
+    # Autosave only happens at the beginning of turns, so we need to manually save at the end
+    print("\nSaving final game state for complete data extraction...")
+    env.unwrapped.civ_controller.save_game()
+    env.unwrapped.civ_controller.delete_save = False  # Prevent deletion
+
     env.close()
 
     print()
@@ -130,9 +214,13 @@ def main():
     print()
 
     # Configuration for world report generation
+    # Use observer recordings if available (complete state without fog of war)
+    # Otherwise fall back to player recordings (limited by fog of war)
+    recording_source = fc_args["username"]
+
     report_config = ReportConfig(
         # Input: where our game recording is stored
-        recording_dir=f'logs/recordings/{fc_args["username"]}/',
+        recording_dir=f'logs/recordings/{recording_source}/',
 
         # Output: where to save the report
         output_dir='reports/latest_game/',

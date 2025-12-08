@@ -6,6 +6,7 @@ Tracks scientific progress and technological advancement.
 from typing import Dict
 from .base_section import BaseSection, SectionData
 from ..utils import metrics, graphs
+from ..utils.savegame_parser import extract_complete_data_from_savegame
 
 
 class TechnologySection(BaseSection):
@@ -43,25 +44,47 @@ class TechnologySection(BaseSection):
 
         html_parts.append('<h2>6. Science and Technology</h2>')
 
+        # Add note about data source
+        html_parts.append(
+            '<p><em>Note: Science and technology data extracted from Freeciv savegame files, providing '
+            'complete cross-civilization data without fog-of-war limitations.</em></p>'
+        )
+
         # Calculate science and tech data for all turns
         science_data = {}    # {turn: {player_id: science_per_turn}}
         tech_count_data = {} # {turn: {player_id: num_techs}}
+
+        # Extract username from recording directory
+        username = 'myagent2'  # default
+        if hasattr(config, 'recording_dir'):
+            parts = config.recording_dir.rstrip('/').split('/')
+            if 'recordings' in parts:
+                idx = parts.index('recordings')
+                if idx + 1 < len(parts):
+                    username = parts[idx + 1]
+
+        # Try to get savegame data for the final turn (most complete data)
+        final_turn = max(sorted_turns)
+        final_savegame_data = extract_complete_data_from_savegame(username, final_turn)
 
         for turn in sorted_turns:
             state = states[turn]
             science_data[turn] = {}
             tech_count_data[turn] = {}
 
+            # Use recordings (fog-of-war limited)
             if 'player' in state:
                 for pid_str, player in state['player'].items():
                     if isinstance(player, dict):
                         pid = int(pid_str)
-
-                        # Science production per turn
                         science_data[turn][pid] = metrics.get_player_science_production(state, pid)
-
-                        # Count known technologies
                         tech_count_data[turn][pid] = metrics.count_known_techs(player)
+
+        # Override final turn with complete savegame data if available
+        if final_savegame_data and 'science' in final_savegame_data:
+            for player_id, sci in final_savegame_data['science'].items():
+                science_data[final_turn][player_id] = sci['science_per_turn']
+                tech_count_data[final_turn][player_id] = sci['techs_known']
 
         # Section 6.1: Science Production
         html_parts.append('<h3>6.1 Science Production</h3>')
