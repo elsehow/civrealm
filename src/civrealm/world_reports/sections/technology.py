@@ -38,14 +38,8 @@ class TechnologySection(BaseSection):
         # Sort turns
         sorted_turns = sorted(states.keys())
 
-        # Get player names from first state
-        first_state = states[sorted_turns[0]] if sorted_turns else {}
-        player_names = {}
-        if 'player' in first_state:
-            for pid, player in first_state['player'].items():
-                if isinstance(player, dict):
-                    pid_int = int(pid)
-                    player_names[pid_int] = self._get_player_name(pid_int, first_state, data_loader)
+        # Collect player names from all states (to include late-joining players)
+        player_names = self._collect_all_player_names(states, data_loader)
 
         html_parts.append('<h2>6. Science and Technology</h2>')
 

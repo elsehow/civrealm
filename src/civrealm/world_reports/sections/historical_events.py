@@ -193,14 +193,8 @@ class HistoricalEventsSection(BaseSection):
             # Generate territory and arable land graphs
             html_parts.append('<h4>Territorial Expansion Over Time</h4>')
 
-            # Get player names (with civilization names)
-            first_state = states[sorted_turns[0]] if sorted_turns else {}
-            player_names = {}
-            if 'player' in first_state:
-                for pid, player in first_state['player'].items():
-                    if isinstance(player, dict):
-                        pid_int = int(pid)
-                        player_names[pid_int] = self._get_player_name(pid_int, first_state, data_loader)
+            # Collect player names from all states (to include late-joining players)
+            player_names = self._collect_all_player_names(states, data_loader)
 
             # Calculate territory data for all turns
             territory_data = {}  # {turn: {player_id: tiles}}
@@ -277,10 +271,18 @@ class HistoricalEventsSection(BaseSection):
             gov_rows = []
             for event in gov_events:
                 turn_str = f"Turn {event.turn}"
-                gov_rows.append([turn_str, event.description])
+                player_name = self._get_player_name(event.player_id, states.get(event.turn, {}), data_loader)
+                # Extract just the government change part from description
+                # Description format: "{player_name} changed government from {old} to {new}"
+                desc_parts = event.description.split(' changed government ')
+                if len(desc_parts) > 1:
+                    change_desc = desc_parts[1]  # "from X to Y"
+                else:
+                    change_desc = event.description
+                gov_rows.append([turn_str, player_name, change_desc])
 
             gov_table = self._format_html_table(
-                headers=['Turn', 'Change'],
+                headers=['Turn', 'Civilization', 'Change'],
                 rows=gov_rows,
                 caption='Government Transitions'
             )

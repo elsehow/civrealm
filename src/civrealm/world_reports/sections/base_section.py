@@ -128,6 +128,41 @@ class BaseSection(ABC):
 
         return f'Player {player_id}'
 
+    def _collect_all_player_names(self, states: Dict[int, Dict], data_loader: Any) -> Dict[int, str]:
+        """Collect civilization names for all players across all states
+
+        This iterates through all states to find all players that appear at any turn,
+        ensuring late-joining players are included in the player_names mapping.
+
+        Args:
+            states: Dict mapping turn numbers to game states
+            data_loader: DataLoader instance with ruleset data
+
+        Returns:
+            Dict mapping player IDs to civilization names
+        """
+        player_names = {}
+        all_player_ids = set()
+
+        # First pass: collect all unique player IDs across all turns
+        for state in states.values():
+            if 'player' in state:
+                for pid in state['player'].keys():
+                    all_player_ids.add(int(pid))
+
+        # Second pass: get names for each player (using latest state where they appear)
+        for player_id in all_player_ids:
+            # Find the latest state where this player exists
+            for turn in sorted(states.keys(), reverse=True):
+                state = states[turn]
+                if 'player' in state:
+                    pid_str = str(player_id)
+                    if pid_str in state['player'] or player_id in state['player']:
+                        player_names[player_id] = self._get_player_name(player_id, state, data_loader)
+                        break
+
+        return player_names
+
     def _format_html_table(
         self,
         headers: List[str],
