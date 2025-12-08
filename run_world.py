@@ -136,10 +136,15 @@ def main():
     # Note: Fog of war is disabled in client_state.py set_multiplayer_game()
     # This ensures complete world data for reports
 
-    # Try entering observer mode to get complete player data
-    print(f"Entering observer mode for complete data access...")
-    env.unwrapped.civ_controller.ws_client.send_message("/observe")
-    time.sleep(1)
+    # Preserve all autosaves throughout the game for complete data extraction
+    print(f"Preserving autosaves for complete historical data...")
+    env.unwrapped.civ_controller.delete_save = False
+
+    # Note: DO NOT enter observer mode - it prevents autosaves on turns 2-50
+    # Observer mode causes handle_begin_turn to exit early without calling save_game()
+    # print(f"Entering observer mode for complete data access...")
+    # env.unwrapped.civ_controller.ws_client.send_message("/observe")
+    # time.sleep(1)
 
     # Set AI difficulty level for all AI players
     print(f"Setting AI difficulty to {AI_DIFFICULTY}...")

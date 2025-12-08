@@ -56,10 +56,6 @@ class EconomicsSection(BaseSection):
         food_data = {}      # {turn: {player_id: food}}
         shields_data = {}   # {turn: {player_id: shields}}
 
-        # Get savegame data for the final turn (most complete data)
-        final_turn = max(sorted_turns)
-        final_savegame_data = get_savegame_data_for_report(config, final_turn)
-
         for turn in sorted_turns:
             state = states[turn]
             gold_data[turn] = {}
@@ -79,12 +75,13 @@ class EconomicsSection(BaseSection):
                     food_data[turn][pid] = metrics.aggregate_city_metric(state, pid, 'prod_food')
                     shields_data[turn][pid] = metrics.aggregate_city_metric(state, pid, 'prod_shield')
 
-        # Override final turn with complete savegame data if available
-        if final_savegame_data and 'production' in final_savegame_data:
-            for player_id, prod in final_savegame_data['production'].items():
-                trade_data[final_turn][player_id] = prod['trade']
-                food_data[final_turn][player_id] = prod['food']
-                shields_data[final_turn][player_id] = prod['shields']
+            # Try to override with complete savegame data for this turn
+            savegame_data = get_savegame_data_for_report(config, turn)
+            if savegame_data and 'production' in savegame_data:
+                for player_id, prod in savegame_data['production'].items():
+                    trade_data[turn][player_id] = prod['trade']
+                    food_data[turn][player_id] = prod['food']
+                    shields_data[turn][player_id] = prod['shields']
 
         # Section 4.1: Treasury (Gold)
         html_parts.append('<h3>4.1 Treasury</h3>')

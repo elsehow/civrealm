@@ -6,7 +6,7 @@ Tracks scientific progress and technological advancement.
 from typing import Dict
 from .base_section import BaseSection, SectionData
 from ..utils import metrics, graphs
-from ..utils.savegame_parser import extract_complete_data_from_savegame
+from ..utils.savegame_parser import get_savegame_data_for_report
 
 
 class TechnologySection(BaseSection):
@@ -54,19 +54,6 @@ class TechnologySection(BaseSection):
         science_data = {}    # {turn: {player_id: science_per_turn}}
         tech_count_data = {} # {turn: {player_id: num_techs}}
 
-        # Extract username from recording directory
-        username = 'myagent2'  # default
-        if hasattr(config, 'recording_dir'):
-            parts = config.recording_dir.rstrip('/').split('/')
-            if 'recordings' in parts:
-                idx = parts.index('recordings')
-                if idx + 1 < len(parts):
-                    username = parts[idx + 1]
-
-        # Try to get savegame data for the final turn (most complete data)
-        final_turn = max(sorted_turns)
-        final_savegame_data = extract_complete_data_from_savegame(username, final_turn)
-
         for turn in sorted_turns:
             state = states[turn]
             science_data[turn] = {}
@@ -80,11 +67,12 @@ class TechnologySection(BaseSection):
                         science_data[turn][pid] = metrics.get_player_science_production(state, pid)
                         tech_count_data[turn][pid] = metrics.count_known_techs(player)
 
-        # Override final turn with complete savegame data if available
-        if final_savegame_data and 'science' in final_savegame_data:
-            for player_id, sci in final_savegame_data['science'].items():
-                science_data[final_turn][player_id] = sci['science_per_turn']
-                tech_count_data[final_turn][player_id] = sci['techs_known']
+            # Try to override with complete savegame data for this turn
+            savegame_data = get_savegame_data_for_report(config, turn)
+            if savegame_data and 'science' in savegame_data:
+                for player_id, sci in savegame_data['science'].items():
+                    science_data[turn][player_id] = sci['science_per_turn']
+                    tech_count_data[turn][player_id] = sci['techs_known']
 
         # Section 6.1: Science Production
         html_parts.append('<h3>6.1 Science Production</h3>')
