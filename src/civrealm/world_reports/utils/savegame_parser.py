@@ -250,6 +250,35 @@ def parse_city_production(savegame_content: str) -> Dict[int, Dict[str, float]]:
     return production
 
 
+def parse_player_nations(savegame_content: str) -> Dict[int, int]:
+    """Parse player nation IDs from savegame
+
+    Args:
+        savegame_content: Decompressed savegame file content
+
+    Returns:
+        Dict mapping player_id to nation_id
+    """
+    player_nations = {}
+
+    # Find all player sections
+    player_sections = re.finditer(r'\[player(\d+)\](.*?)\n\[', savegame_content, re.DOTALL)
+
+    for player_match in player_sections:
+        player_id = int(player_match.group(1))
+        player_content = player_match.group(2)
+
+        # Extract nation ID
+        nation_match = re.search(r'nation="?([^"\n]+)"?', player_content)
+        if nation_match:
+            nation_str = nation_match.group(1)
+            # Nation can be either a name (string) or ID (number)
+            # For now, try to extract it as is - we'll handle lookup later
+            player_nations[player_id] = nation_str
+
+    return player_nations
+
+
 def parse_player_science(savegame_content: str) -> Dict[int, Dict[str, any]]:
     """Parse science and technology data from savegame
 
@@ -342,7 +371,7 @@ def parse_player_science(savegame_content: str) -> Dict[int, Dict[str, any]]:
 
 
 def extract_complete_data_from_savegame(username: str, turn: int, host: str = 'localhost', port: int = 8080) -> Optional[Dict[str, any]]:
-    """Extract complete game data from savegame (production, science, technologies)
+    """Extract complete game data from savegame (production, science, technologies, nations)
 
     This is the main entry point for getting fog-of-war-free complete data.
 
@@ -353,10 +382,11 @@ def extract_complete_data_from_savegame(username: str, turn: int, host: str = 'l
         port: Server port
 
     Returns:
-        Dict with keys 'production' and 'science' if successful, None otherwise:
+        Dict with keys 'production', 'science', and 'nations' if successful, None otherwise:
         {
             'production': {player_id: {'food': float, 'shields': float, 'trade': float}},
-            'science': {player_id: {'science_per_turn': int, 'techs_known': int, 'researching': str}}
+            'science': {player_id: {'science_per_turn': int, 'techs_known': int, 'researching': str}},
+            'nations': {player_id: nation_name_or_id}
         }
     """
     # Find savegame on server
@@ -386,11 +416,13 @@ def extract_complete_data_from_savegame(username: str, turn: int, host: str = 'l
         # Parse all data
         production = parse_city_production(content)
         science = parse_player_science(content)
+        nations = parse_player_nations(content)
 
         print(f"Extracted complete data for {len(production)} players from savegame")
         return {
             'production': production,
-            'science': science
+            'science': science,
+            'nations': nations
         }
 
     except Exception as e:

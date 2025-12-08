@@ -88,6 +88,41 @@ class BaseSection(ABC):
                 return nation.get('adjective') or nation.get('rule_name', '')
         return ''
 
+    def _get_nation_name_from_savegame_data(self, nation_identifier: any, data_loader: Any) -> str:
+        """Get nation/civilization name from savegame nation identifier
+
+        The savegame may store nation as either a numeric ID or a string name.
+
+        Args:
+            nation_identifier: Nation ID (int) or name (str) from savegame
+            data_loader: DataLoader instance with ruleset data
+
+        Returns:
+            Nation name or empty string if not found
+        """
+        if not data_loader.ruleset or 'nations' not in data_loader.ruleset:
+            return ''
+
+        nations = data_loader.ruleset['nations']
+
+        # Try as numeric ID first
+        try:
+            nation_id = int(nation_identifier)
+            nation_key = str(nation_id)
+            if nation_key in nations:
+                nation = nations[nation_key]
+                return nation.get('adjective') or nation.get('rule_name', '')
+        except (ValueError, TypeError):
+            pass
+
+        # Try as string name - search for matching rule_name
+        nation_str = str(nation_identifier).strip('"')
+        for nation_data in nations.values():
+            if nation_data.get('rule_name') == nation_str:
+                return nation_data.get('adjective') or nation_data.get('rule_name', '')
+
+        return ''
+
     def _get_player_name(self, player_id: int, state: Dict, data_loader: Any) -> str:
         """Get civilization name for a player
 
@@ -162,6 +197,36 @@ class BaseSection(ABC):
                         break
 
         return player_names
+
+    def _filter_active_players(self, player_names: Dict[int, str], states: Dict[int, Dict]) -> Dict[int, str]:
+        """Filter player_names to only include players who are alive in the final state
+
+        Args:
+            player_names: Dict mapping player_id to civilization name
+            states: Dict mapping turn numbers to game states
+
+        Returns:
+            Filtered dict with only active players
+        """
+        if not states:
+            return player_names
+
+        # Get final state
+        final_turn = max(states.keys())
+        final_state = states[final_turn]
+
+        if 'player' not in final_state:
+            return player_names
+
+        # Collect alive player IDs from final state
+        alive_player_ids = set()
+        for pid_str, player_info in final_state['player'].items():
+            if isinstance(player_info, dict):
+                if player_info.get('is_alive', False):
+                    alive_player_ids.add(int(pid_str))
+
+        # Filter player_names to only include alive players
+        return {pid: name for pid, name in player_names.items() if pid in alive_player_ids}
 
     def _format_html_table(
         self,

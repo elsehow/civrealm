@@ -41,14 +41,10 @@ class EconomicsSection(BaseSection):
 
         # Collect player names from all states (to include late-joining players)
         player_names = self._collect_all_player_names(states, data_loader)
+        # Filter to only active players
+        player_names = self._filter_active_players(player_names, states)
 
         html_parts.append('<h2>4. Economics</h2>')
-
-        # Add note about data source
-        html_parts.append(
-            '<p><em>Note: Production metrics are extracted from Freeciv savegame files, providing '
-            'complete cross-civilization data without fog-of-war limitations. Gold data is from game recordings.</em></p>'
-        )
 
         # Calculate economic metrics for all turns
         gold_data = {}      # {turn: {player_id: gold}}
@@ -82,6 +78,27 @@ class EconomicsSection(BaseSection):
                     trade_data[turn][player_id] = prod['trade']
                     food_data[turn][player_id] = prod['food']
                     shields_data[turn][player_id] = prod['shields']
+
+                    # Add player names for players that only appear in savegame data
+                    # Only add if they are alive in the final state
+                    if player_id not in player_names:
+                        # Check if this player is alive in the final state before adding
+                        final_turn = max(sorted_turns)
+                        final_state = states[final_turn]
+                        if 'player' in final_state:
+                            player_key = str(player_id)
+                            player_info = final_state['player'].get(player_key) or final_state['player'].get(player_id)
+                            if isinstance(player_info, dict) and player_info.get('is_alive', False):
+                                # Try to get nation name from savegame data
+                                if 'nations' in savegame_data and player_id in savegame_data['nations']:
+                                    nation_id = savegame_data['nations'][player_id]
+                                    civ_name = self._get_nation_name_from_savegame_data(nation_id, data_loader)
+                                    if civ_name:
+                                        player_names[player_id] = civ_name
+                                    else:
+                                        player_names[player_id] = f'Player {player_id}'
+                                else:
+                                    player_names[player_id] = self._get_player_name(player_id, state, data_loader)
 
         # Section 4.1: Treasury (Gold)
         html_parts.append('<h3>4.1 Treasury</h3>')

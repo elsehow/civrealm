@@ -40,6 +40,8 @@ class DemographicsSection(BaseSection):
 
         # Collect player names from all states (to include late-joining players)
         player_names = self._collect_all_player_names(states, data_loader)
+        # Filter to only active players
+        player_names = self._filter_active_players(player_names, states)
 
         html_parts.append('<h2>5. Social Characteristics</h2>')
         html_parts.append('<h3>5.1 Demographics</h3>')
