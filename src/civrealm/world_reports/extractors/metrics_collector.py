@@ -85,6 +85,9 @@ class MetricsCollector:
         print("  Collecting civilizations...")
         civilizations = self.collect_civilizations(states, data_loader, config)
 
+        # Update civilization count in metadata to match what we're actually displaying
+        metadata["num_civilizations"] = len(civilizations)
+
         print("  Collecting time series data...")
         time_series = self.collect_time_series(states, config, civilizations)
 
@@ -216,20 +219,8 @@ class MetricsCollector:
                     }
                     break
 
-        # Filter to only alive players in final state
-        final_turn = max(states.keys())
-        final_state = states[final_turn]
-        if 'player' in final_state:
-            alive_ids = set()
-            for pid_str, player_info in final_state['player'].items():
-                if isinstance(player_info, dict) and player_info.get('is_alive', False):
-                    alive_ids.add(int(pid_str))
-
-            civilizations = {
-                pid: info for pid, info in civilizations.items()
-                if pid in alive_ids
-            }
-
+        # Include all players that appear in the game (including barbarians, pirates, etc.)
+        # Don't filter by is_alive so we can see all factions in charts
         return civilizations
 
     def collect_time_series(
@@ -336,11 +327,15 @@ class MetricsCollector:
 
                             # Only override techs_known if it's higher or equal
                             # Technologies can never decrease (can't un-discover a tech)
-                            current_techs = time_series["techs_known"][turn][player_id]
                             savegame_techs = sci['techs_known']
-                            if savegame_techs >= current_techs:
+                            if player_id in time_series["techs_known"][turn]:
+                                current_techs = time_series["techs_known"][turn][player_id]
+                                if savegame_techs >= current_techs:
+                                    time_series["techs_known"][turn][player_id] = savegame_techs
+                                # Otherwise keep the state file value (it's more reliable)
+                            else:
+                                # No state data for this player, use savegame data
                                 time_series["techs_known"][turn][player_id] = savegame_techs
-                            # Otherwise keep the state file value (it's more reliable)
 
         # Post-processing: Enforce monotonicity for techs_known
         # Technologies can never decrease - if we see a drop, it's bad data
@@ -348,6 +343,9 @@ class MetricsCollector:
         for pid in player_ids:
             max_techs_seen = 0
             for turn in sorted_turns:
+                # Skip if this turn doesn't have data for this player
+                if turn not in time_series["techs_known"]:
+                    continue
                 if pid in time_series["techs_known"][turn]:
                     current_techs = time_series["techs_known"][turn][pid]
                     # If current is less than max seen, use max instead (bad data)

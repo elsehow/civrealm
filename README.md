@@ -1,37 +1,34 @@
-# *CivRealm*: A Learning and Reasoning Odyssey in *Civilization* for Decision-Making Agents
+# CivRealm World Reports
 
-<div align="center">
+A fork of [CivRealm](https://github.com/bigai-ai/civrealm) that adds comprehensive world report generation capabilities for analyzing Civilization games.
 
-[[Arxiv]](https://arxiv.org/abs/2401.10568)
-[[PDF]](https://arxiv.org/pdf/2401.10568.pdf)
-[[Docs]](https://bigai-ai.github.io/civrealm/)
-[[LLM Agents]](https://github.com/bigai-ai/civrealm-llm-baseline)
-[[Tensor Agent]](https://github.com/bigai-ai/civrealm-tensor-baseline)
+## About This Fork
 
-[![Documentation Status](https://readthedocs.org/projects/openreview-py/badge/?version=latest)](<https://bigai-ai.github.io/civrealm>)
-[![PyPI](https://img.shields.io/pypi/v/civrealm)](https://pypi.org/project/civrealm/)
-[![PyPI - Python Version](https://img.shields.io/python/required-version-toml?tomlFilePath=https://raw.githubusercontent.com/bigai-ai/civrealm/dev/pyproject.toml)](https://pypi.org/project/civrealm/)
-[![PyPI Status](https://pepy.tech/badge/civrealm)](https://pepy.tech/project/civrealm)
-[![GitHub license](https://img.shields.io/github/license/bigai-ai/civrealm)](https://github.com/bigai-ai/civrealm/blob/main/LICENSE)
+This project builds on the excellent [CivRealm](https://github.com/bigai-ai/civrealm) framework developed by BIGAI, which provides a Gymnasium-compatible environment for the open-source strategy game [Freeciv-web](https://github.com/freeciv/freeciv-web).
 
-</div>
-
-CivRealm is an interactive environment for the open-source strategy game [Freeciv-web](https://github.com/freeciv/freeciv-web), based on [Freeciv](https://www.freeciv.org/), a Civilization-like game. Within CivRealm, we provide interfaces for two typical types of agents: tensor-based reinforcement learning agents (see [Tensor-agent Repo](https://github.com/bigai-ai/civrealm-tensor-baseline)) based on the [Gymnasium](https://gymnasium.farama.org/) API, and language-based agents (see [LLM-agent Repo](https://github.com/bigai-ai/civrealm-llm-baseline)) driven by language models.
-
-We also provide a set of tools for training and evaluating agents, as well as a set of baselines for both types of agents. We hope that CivRealm can serve as a testbed for the development and evaluation of agents that can learn and reason in complex environments. Detailed usage of the CivRealm API can be found in the [Documentation](https://bigai-ai.github.io/civrealm).
+**What's New:** We've extended CivRealm with a world report generation system that automatically produces detailed analytical reports from AI-vs-AI gameplay, including:
+- Economic metrics and trade analysis
+- Demographic trends and population statistics
+- Technology advancement tracking
+- Historical event timelines
+- Interactive visualizations and territory maps
 
 ![Punic War](docs/assets/punic_war_base.jpg)
 
 # Contents
 
-- [About](#about)
+- [About This Fork](#about-this-fork)
+- [How It Works](#how-it-works)
+  - [Running AI Games with run_world.py](#running-ai-games-with-run_worldpy)
+  - [Data Production Pipeline](#data-production-pipeline)
+  - [World Report Generation](#world-report-generation)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Testing the Installation](#testing-the-installation)
   - [Single player mode (against built-in AIs)](#single-player-mode-against-built-in-ais)
   - [Multiplayer mode](#multiplayer-mode)
 - [Trouble Shooting](#trouble-shooting)
-- [Our Paper](#check-out-our-paper)
+- [Original CivRealm Project](#original-civrealm-project)
 
 ## About
 
@@ -48,13 +45,7 @@ After starting the Freeciv-web service, you can connect to the Freeciv-web serve
 
 ## Installation
 
-You can install the stable version of CivRealm by:
-
-```bash
-pip install civrealm
-```
-
-To install the latest version from the source code or contribute to the project, please follow the instructions below:
+Install with:
 
 ```bash
 git clone git@github.com:bigai-ai/civrealm.git && cd civrealm

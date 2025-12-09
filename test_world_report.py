@@ -30,7 +30,7 @@ def main():
 
         # Generate reports at specific turns
         # Set to the turns you want to analyze
-        report_turns=[50],  # Adjust based on available data
+        report_turns=[380],  # Test with the full game data
 
         # Enable all implemented sections
         enabled_sections=['overview', 'historical_events', 'economics', 'demographics', 'technology'],

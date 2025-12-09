@@ -71,10 +71,23 @@ class ReportGenerator:
         Args:
             turn: Target turn number (report covers 0 to turn inclusive)
         """
-        # Stage 1: Extract data to JSON
-        json_file = f"{self.config.output_dir}/turn_{turn:03d}_data.json"
+        # Stage 1: Extract data (returns dict with actual turn in metadata)
         print(f"  Stage 1: Extracting data...")
-        self.generate_data(turn, json_file)
+        data = self.generate_data(turn, output_file=None)
+
+        # Get actual turn from the data (may be less than requested if data unavailable)
+        actual_turn = data['metadata']['turn']
+
+        # Warn if we got less data than requested
+        if actual_turn < turn:
+            print(f"  Warning: Requested turn {turn}, but only data up to turn {actual_turn} available")
+
+        # Use actual turn for filenames
+        json_file = f"{self.config.output_dir}/turn_{actual_turn:03d}_data.json"
+
+        # Write JSON with correct filename
+        from .extractors import write_world_data
+        write_world_data(data, json_file)
 
         # Stage 2: Render HTML from JSON
         print(f"  Stage 2: Rendering HTML...")
