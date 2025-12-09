@@ -333,7 +333,28 @@ class MetricsCollector:
                     for player_id, sci in savegame_data['science'].items():
                         if player_id in player_ids:
                             time_series["science"][turn][player_id] = sci['science_per_turn']
-                            time_series["techs_known"][turn][player_id] = sci['techs_known']
+
+                            # Only override techs_known if it's higher or equal
+                            # Technologies can never decrease (can't un-discover a tech)
+                            current_techs = time_series["techs_known"][turn][player_id]
+                            savegame_techs = sci['techs_known']
+                            if savegame_techs >= current_techs:
+                                time_series["techs_known"][turn][player_id] = savegame_techs
+                            # Otherwise keep the state file value (it's more reliable)
+
+        # Post-processing: Enforce monotonicity for techs_known
+        # Technologies can never decrease - if we see a drop, it's bad data
+        sorted_turns = sorted(time_series["techs_known"].keys())
+        for pid in player_ids:
+            max_techs_seen = 0
+            for turn in sorted_turns:
+                if pid in time_series["techs_known"][turn]:
+                    current_techs = time_series["techs_known"][turn][pid]
+                    # If current is less than max seen, use max instead (bad data)
+                    if current_techs < max_techs_seen:
+                        time_series["techs_known"][turn][pid] = max_techs_seen
+                    else:
+                        max_techs_seen = current_techs
 
         return time_series
 

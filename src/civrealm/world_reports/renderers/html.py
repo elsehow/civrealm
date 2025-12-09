@@ -250,11 +250,14 @@ class HTMLRenderer:
                     try:
                         # Load state for this turn
                         state = self.data_loader.get_state(snapshot_turn)
-                        if state:
+                        if state and 'map' in state and 'player' in state:
                             # Generate territory map
-                            img_buf = self.visualizer.create_territory_map(
-                                state=state,
-                                title=f'Turn {snapshot_turn}'
+                            img_buf = self.visualizer.render_territory_map(
+                                map_state=state['map'],
+                                player_state=state['player'],
+                                title=f'Turn {snapshot_turn}',
+                                highlight_cities=True,
+                                show_legend=True
                             )
 
                             img_name = f'territory_turn_{snapshot_turn}'
@@ -709,7 +712,7 @@ class HTMLRenderer:
 
         .mini-maps-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(700px, 1fr));
             gap: 20px;
             margin: 20px 0;
         }

@@ -43,7 +43,7 @@ fc_args['username'] = 'myagent2'
 fc_args['debug.record_action_and_observation'] = True
 
 # Game Configuration
-MAX_TURNS = 50  # Full game with savegame-based complete data extraction
+MAX_TURNS = 500  # Full game with savegame-based complete data extraction
 fc_args['max_turns'] = MAX_TURNS
 
 # Don't wait for observer - let observer join dynamically
