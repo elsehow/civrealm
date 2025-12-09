@@ -370,6 +370,82 @@ def parse_player_science(savegame_content: str) -> Dict[int, Dict[str, any]]:
     return science_data
 
 
+def parse_player_technologies(savegame_content: str, ruleset_techs: Optional[Dict] = None) -> Dict[int, set]:
+    """Parse detailed technology discoveries from savegame
+
+    Args:
+        savegame_content: Decompressed savegame file content
+        ruleset_techs: Optional dict mapping tech_id to tech data from ruleset
+
+    Returns:
+        Dict mapping player_id to set of known tech IDs:
+        {
+            player_id: {tech_id1, tech_id2, ...}
+        }
+    """
+    player_techs = {}
+
+    # Find research section
+    research_match = re.search(r'\[research\](.*?)\ncount=', savegame_content, re.DOTALL)
+    if not research_match:
+        return player_techs
+
+    research_content = research_match.group(1)
+
+    # Find research schema - note: it doesn't have closing }, just ends with newline
+    schema_match = re.search(r'r=\{(.+)\n', research_content)
+    if not schema_match:
+        return player_techs
+
+    schema = schema_match.group(1).replace('"', '').split(',')
+
+    try:
+        number_idx = schema.index('number')
+        done_idx = schema.index('done')
+    except ValueError:
+        return player_techs
+
+    # Find research data lines - they start with a number
+    # Format: number,"goal_name",techs,futuretech,bulbs_before,"saved_name",bulbs,"now_name",free_bulbs,"done_binary_string"
+    research_lines = re.findall(r'^(\d+,.+)$', research_content, re.MULTILINE)
+
+    for line in research_lines:
+        # Parse CSV carefully, handling quoted strings
+        values = []
+        current = ""
+        in_quotes = False
+        for char in line:
+            if char == '"':
+                in_quotes = not in_quotes
+            elif char == ',' and not in_quotes:
+                values.append(current)
+                current = ""
+            else:
+                current += char
+        values.append(current)
+
+        if len(values) <= max(number_idx, done_idx):
+            continue
+
+        try:
+            player_id = int(values[number_idx])
+            done_string = values[done_idx].strip('"')
+
+            # Parse binary string - each '1' means tech is known
+            # Tech IDs start at 0
+            known_techs = set()
+            for tech_id, bit in enumerate(done_string):
+                if bit == '1':
+                    known_techs.add(str(tech_id))
+
+            player_techs[player_id] = known_techs
+
+        except (ValueError, IndexError):
+            continue
+
+    return player_techs
+
+
 def extract_complete_data_from_savegame(username: str, turn: int, host: str = 'localhost', port: int = 8080) -> Optional[Dict[str, any]]:
     """Extract complete game data from savegame (production, science, technologies, nations)
 
@@ -417,12 +493,14 @@ def extract_complete_data_from_savegame(username: str, turn: int, host: str = 'l
         production = parse_city_production(content)
         science = parse_player_science(content)
         nations = parse_player_nations(content)
+        technologies = parse_player_technologies(content)
 
         print(f"Extracted complete data for {len(production)} players from savegame")
         return {
             'production': production,
             'science': science,
-            'nations': nations
+            'nations': nations,
+            'technologies': technologies
         }
 
     except Exception as e:

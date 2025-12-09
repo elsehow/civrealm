@@ -122,34 +122,114 @@ class EventDetector:
         if prev_state is None:
             return events
 
-        # Compare player tech flags
-        prev_players = prev_state.get('player', {})
-        curr_players = curr_state.get('player', {})
+        # Compare tech states using the top-level 'tech' dict
+        prev_techs = prev_state.get('tech', {})
+        curr_techs = curr_state.get('tech', {})
 
-        for player_id in curr_players:
-            if player_id not in prev_players:
+        if not prev_techs or not curr_techs:
+            return events
+
+        # Check each technology
+        for tech_id, curr_tech_data in curr_techs.items():
+            if not isinstance(curr_tech_data, dict):
                 continue
 
-            prev_player = prev_players[player_id]
-            curr_player = curr_players[player_id]
-
-            if not isinstance(prev_player, dict) or not isinstance(curr_player, dict):
+            prev_tech_data = prev_techs.get(tech_id, {})
+            if not isinstance(prev_tech_data, dict):
                 continue
 
-            # Look for tech_N flags that changed from False to True
-            for key, value in curr_player.items():
-                if key.startswith('tech_') and value is True:
-                    prev_value = prev_player.get(key, False)
-                    if not prev_value:
-                        # Tech discovered!
-                        tech_num = key.split('_')[1]
+            # inv_state is a bitmask: bit N = 1 means player N knows the tech
+            prev_inv_state = prev_tech_data.get('inv_state', 0)
+            curr_inv_state = curr_tech_data.get('inv_state', 0)
+
+            # Find which players discovered this tech (new bits set)
+            newly_discovered = curr_inv_state & ~prev_inv_state
+
+            if newly_discovered:
+                tech_name = curr_tech_data.get('name', f'Tech #{tech_id}')
+
+                # Check each player bit
+                for player_id in range(8):  # Check up to 8 players
+                    player_mask = 1 << player_id
+                    if newly_discovered & player_mask:
+                        # This player discovered the tech this turn
+                        player_name = self._get_player_name(curr_state, player_id)
                         events.append(GameEvent(
                             turn=turn,
                             event_type='tech_discovered',
-                            description=f"Technology #{tech_num} discovered",
+                            description=f"{player_name} discovered {tech_name}",
                             player_id=player_id,
-                            metadata={'tech_id': tech_num}
+                            metadata={
+                                'tech_id': tech_id,
+                                'tech_name': tech_name
+                            }
                         ))
+
+        return events
+
+    def detect_tech_discoveries_from_savegames(
+        self,
+        prev_savegame_data: Optional[Dict],
+        curr_savegame_data: Optional[Dict],
+        curr_state: Dict,
+        turn: int
+    ) -> List[GameEvent]:
+        """Detect technology discoveries using savegame data (complete visibility)
+
+        Args:
+            prev_savegame_data: Previous turn savegame data with 'technologies' key
+            curr_savegame_data: Current turn savegame data with 'technologies' key
+            curr_state: Current turn state (for player names)
+            turn: Current turn number
+
+        Returns:
+            List of tech discovery events
+        """
+        events = []
+
+        if not prev_savegame_data or not curr_savegame_data:
+            return events
+
+        prev_techs = prev_savegame_data.get('technologies', {})
+        curr_techs = curr_savegame_data.get('technologies', {})
+
+        if not prev_techs or not curr_techs:
+            return events
+
+        # Get tech names from state if available
+        tech_names = {}
+        if 'tech' in curr_state:
+            for tech_id, tech_data in curr_state['tech'].items():
+                if isinstance(tech_data, dict):
+                    tech_names[tech_id] = tech_data.get('name', f'Tech #{tech_id}')
+
+        # Check each player for new techs
+        for player_id in curr_techs:
+            prev_player_techs = prev_techs.get(player_id, set())
+            curr_player_techs = curr_techs.get(player_id, set())
+
+            # Skip if this is the first turn we have data for this player
+            # (to avoid false positives from initial tech state)
+            if player_id not in prev_techs:
+                continue
+
+            # Find newly discovered techs
+            new_techs = curr_player_techs - prev_player_techs
+
+            for tech_id in new_techs:
+                tech_name = tech_names.get(tech_id, f'Tech #{tech_id}')
+                player_name = self._get_player_name(curr_state, player_id)
+
+                events.append(GameEvent(
+                    turn=turn,
+                    event_type='tech_discovered',
+                    description=f"{player_name} discovered {tech_name}",
+                    player_id=player_id,
+                    metadata={
+                        'tech_id': tech_id,
+                        'tech_name': tech_name
+                    }
+                ))
 
         return events
 
@@ -191,7 +271,7 @@ class EventDetector:
             curr_gov = curr_player.get('government_name', '')
 
             if prev_gov and curr_gov and prev_gov != curr_gov:
-                player_name = curr_player.get('name', f'Player {player_id}')
+                player_name = self._get_player_name(curr_state, int(player_id))
                 events.append(GameEvent(
                     turn=turn,
                     event_type='government_change',

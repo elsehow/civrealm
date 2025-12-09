@@ -92,7 +92,7 @@ class MetricsCollector:
         time_series = self.collect_time_series(states, config, civilizations)
 
         print("  Detecting events...")
-        events = self.collect_events(states, data_loader)
+        events = self.collect_events(states, data_loader, config)
 
         print("  Collecting snapshots...")
         snapshots = self.collect_snapshots(states, max_turn)
@@ -359,13 +359,15 @@ class MetricsCollector:
     def collect_events(
         self,
         states: Dict[int, Dict],
-        data_loader: Any
+        data_loader: Any,
+        config: Any = None
     ) -> List[Dict[str, Any]]:
         """Collect all game events
 
         Args:
             states: Dict mapping turn numbers to game states
             data_loader: DataLoader instance
+            config: Optional ReportConfig for savegame access
 
         Returns:
             List of event dictionaries
@@ -375,10 +377,67 @@ class MetricsCollector:
 
         sorted_turns = sorted(states.keys())
         prev_state = None
+        prev_savegame_data = None
+
+        # Track all techs seen so far for each player (to avoid duplicate discoveries)
+        all_techs_seen = {}  # {player_id: set of tech_ids}
 
         for turn in sorted_turns:
             curr_state = states[turn]
-            game_events = detector.detect_all_events(prev_state, curr_state, turn)
+
+            # Try to get savegame data for more complete tech visibility
+            curr_savegame_data = None
+            if config:
+                curr_savegame_data = get_savegame_data_for_report(config, turn)
+
+            # Detect regular events (city, government, diplomatic)
+            game_events = detector.detect_city_events(prev_state, curr_state, turn)
+            game_events.extend(detector.detect_government_changes(prev_state, curr_state, turn))
+            game_events.extend(detector.detect_diplomatic_changes(prev_state, curr_state, turn))
+
+            # For tech discoveries, prefer savegame data (complete visibility)
+            # Use all_techs_seen to avoid counting same tech multiple times
+            if curr_savegame_data:
+                curr_techs = curr_savegame_data.get('technologies', {})
+
+                # Get tech names from state if available
+                tech_names = {}
+                if 'tech' in curr_state:
+                    for tech_id, tech_data in curr_state['tech'].items():
+                        if isinstance(tech_data, dict):
+                            tech_names[tech_id] = tech_data.get('name', f'Tech #{tech_id}')
+
+                # Check each player for genuinely new techs
+                for player_id, curr_player_techs in curr_techs.items():
+                    if player_id not in all_techs_seen:
+                        all_techs_seen[player_id] = set()
+
+                    # Find techs this player knows that we haven't seen before
+                    new_techs = curr_player_techs - all_techs_seen[player_id]
+
+                    # Add these techs to the player's seen set
+                    all_techs_seen[player_id].update(new_techs)
+
+                    # Create discovery events
+                    from ..utils.event_detector import GameEvent
+                    for tech_id in new_techs:
+                        tech_name = tech_names.get(tech_id, f'Tech #{tech_id}')
+                        player_name = detector._get_player_name(curr_state, player_id)
+
+                        game_events.append(GameEvent(
+                            turn=turn,
+                            event_type='tech_discovered',
+                            description=f"{player_name} discovered {tech_name}",
+                            player_id=player_id,
+                            metadata={
+                                'tech_id': tech_id,
+                                'tech_name': tech_name
+                            }
+                        ))
+            elif prev_state:
+                # Fall back to state-based detection if savegame unavailable
+                tech_events = detector.detect_tech_discoveries(prev_state, curr_state, turn)
+                game_events.extend(tech_events)
 
             # Convert GameEvent objects to dictionaries
             for event in game_events:
@@ -398,6 +457,7 @@ class MetricsCollector:
                 all_events.append(event_dict)
 
             prev_state = curr_state
+            prev_savegame_data = curr_savegame_data
 
         return all_events
 
