@@ -306,13 +306,13 @@ class HTMLRenderer:
 
         if tech_events:
             rows = []
-            for event in tech_events[:20]:  # Limit to first 20
+            for event in tech_events:  # Show all discoveries
                 turn_str = f"Turn {event['turn']}"
                 description = event['description']
                 rows.append(f'<tr><td>{turn_str}</td><td>{description}</td></tr>')
 
             html.append('<table class="data-table">')
-            html.append('<caption>Major Technology Discoveries (First 20)</caption>')
+            html.append(f'<caption>Technology Discoveries ({len(tech_events)} total)</caption>')
             html.append('<thead><tr><th>Turn</th><th>Discovery</th></tr></thead>')
             html.append('<tbody>')
             html.append('\n'.join(rows))
